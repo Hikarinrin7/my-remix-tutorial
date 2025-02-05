@@ -1,26 +1,50 @@
-import { json } from "@remix-run/node";
+import { json, redirect } from "@remix-run/node";
+import { useEffect } from "react";
+
 
 import {
   Form,
   Link,
   Links,
   Meta,
+  NavLink,
   Outlet,
   Scripts,
   ScrollRestoration,
   useLoaderData,
+  useNavigation,
+  useSubmit,
 } from "@remix-run/react";
 
 // root.tsxからloader関数をエクスポートしてデータをレンダリングする
-import { getContacts } from "./data";
-export const loader = async () => {
-  const contacts = await getContacts();
-  return json({ contacts });
+// import { getContacts } from "./data";
+// 検索機能のためにちょっと書き換えた。GETなのでaction関数は呼び出されず、URLが変更されるだけ
+export const loader = async ({
+  request,
+}: LoaderFunctionArgs) => {
+  const url = new URL(request.url);
+  const q = url.searchParams.get("q");
+  const contacts = await getContacts(q);
+  return json({ contacts, q });
+};
+
+// root.tsxからaction関数をエクスポートする（連絡先の作成）
+import { createEmptyContact, getContacts } from "./data";
+export const action = async () => {
+  const contact = await createEmptyContact();
+  // 新規レコードを作ったとき、編集ページにリダイレクトするようにする。以下のコードを変更
+  // return json({ contact });
+  return redirect(`/contacts/${contact.id}/edit`);
 };
 
 
+
 // css読み込み
-import type { LinksFunction } from "@remix-run/node";
+import type { 
+  LinksFunction,
+  // 検索機能の実装
+  LoaderFunctionArgs,
+} from "@remix-run/node";
 import appStylesHref from "./app.css?url";
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: appStylesHref },
@@ -29,7 +53,25 @@ export const links: LinksFunction = () => [
 
 export default function App() {
   // root.tsxからloader関数をエクスポートしてデータをレンダリングする
-  const { contacts } = useLoaderData<typeof loader>();
+  const { contacts, q } = useLoaderData<typeof loader>();
+  // loading...を表示するためのコード。useNavigationは現在のナビゲーションの状態をidleかloadingかsubmittingで返す
+  const navigation = useNavigation();
+  // 検索窓に入力中にリアルタイムでフィルターをかける
+  const submit = useSubmit();
+  // 読み込み中のグルグルを出すため、検索中かどうかを知るための変数を追加。まずナビゲートしているか、していたら検索中かどうか、を確認
+  const searching =
+    navigation.location &&
+    new URLSearchParams(navigation.location.search).has(
+      "q"
+    );
+
+  // URLSearchParamsと入力値を同期させる
+  useEffect(() => {
+    const searchField = document.getElementById("q");
+    if (searchField instanceof HTMLInputElement) {
+      searchField.value = q || "";
+    }
+  }, [q]);
 
   return (
     <html lang="en">
@@ -43,15 +85,30 @@ export default function App() {
         <div id="sidebar">
           <h1>Remix Contacts</h1>
           <div>
-            <Form id="search-form" role="search">
+          {/* // 検索窓に入力中にリアルタイムでフィルターをかける */}
+            <Form
+              id="search-form"
+              onChange={(event) =>
+                submit(event.currentTarget)
+              }
+              role="search">
               <input
                 id="q"
                 aria-label="Search contacts"
+                // 読み込み中のグルグル。"loading"はデフォルトのアイコンなのだろうか
+                className={searching ? "loading" : ""}
+                // 検索後の検索窓に入力内容を残すために、デフォルトをurlから取得する！（検索時のurlは[q=paul]って感じ）
+                defaultValue={q || ""}
                 placeholder="Search"
                 type="search"
                 name="q"
               />
-              <div id="search-spinner" aria-hidden hidden={true} />
+              <div
+                id="search-spinner"
+                aria-hidden
+                // 読み込み中のグルグル
+                hidden={!searching}
+              />
             </Form>
             <Form method="post">
               <button type="submit">New</button>
@@ -69,18 +126,32 @@ export default function App() {
               <ul>
                 {contacts.map((contact) => (
                   <li key={contact.id}>
-                    <Link to={`contacts/${contact.id}`}>
-                      {contact.first || contact.last ? (
-                        <>
-                          {contact.first} {contact.last}
-                        </>
-                      ) : (
-                        <i>No Name</i>
-                      )}{" "}
-                      {contact.favorite ? (
-                        <span>★</span>
-                      ) : null}
-                    </Link>
+                    {/* サイドバーをナビリンクで囲み、選択した人にサイドバーで色がつくようにした */}
+                    <NavLink
+                      className={({ isActive, isPending }) =>
+                        isActive
+                          ? "active"
+                          : isPending
+                          ? "pending"
+                          : ""
+                      }
+                      to={`contacts/${contact.id}`}
+                    >
+
+                      <Link to={`contacts/${contact.id}`}>
+                        {contact.first || contact.last ? (
+                          <>
+                            {contact.first} {contact.last}
+                          </>
+                        ) : (
+                          <i>No Name</i>
+                        )}{" "}
+                        {contact.favorite ? (
+                          <span>★</span>
+                        ) : null}
+                      </Link>
+
+                    </NavLink>
                   </li>
                 ))}
               </ul>
@@ -92,7 +163,15 @@ export default function App() {
           </nav>
         </div>
 
-        <div id="detail">
+        <div
+          // loading...でちょっとフェードさせるためのnavigation、でもメイン画面のときはフェードさせない
+          className={
+            navigation.state === "loading" && !searching
+              ? "loading" 
+              : ""
+          }
+          id="detail"
+        >
           <Outlet />
         </div>
 

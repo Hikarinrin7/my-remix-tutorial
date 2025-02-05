@@ -1,4 +1,4 @@
-import { Form } from "@remix-run/react";
+// import { Form } from "@remix-run/react";
 import type { FunctionComponent } from "react";
 
 import type { ContactRecord } from "../data";
@@ -31,14 +31,14 @@ export default function Contact() {
   // 連絡先ページにloader関数を追加して、useLoaderDataを使ってデータにアクセスする
   const { contact } = useLoaderData<typeof loader>();
 
-  const contact = {
-    first: "Your",
-    last: "Name",
-    avatar: "https://placecats.com/200/200",
-    twitter: "your_handle",
-    notes: "Some notes",
-    favorite: true,
-  };
+  // const contact = {
+  //   first: "Your",
+  //   last: "Name",
+  //   avatar: "https://placecats.com/200/200",
+  //   twitter: "your_handle",
+  //   notes: "Some notes",
+  //   favorite: true,
+  // };
 
   return (
     <div id="contact">
@@ -80,6 +80,7 @@ export default function Contact() {
           </Form>
 
           <Form
+            // contacts.\$contactId_.destroy.tsxにリクエストを送信
             action="destroy"
             method="post"
             onSubmit={(event) => {
