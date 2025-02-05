@@ -88,9 +88,14 @@ export default function App() {
           {/* // 検索窓に入力中にリアルタイムでフィルターをかける */}
             <Form
               id="search-form"
-              onChange={(event) =>
-                submit(event.currentTarget)
-              }
+              // 検索窓に入力するたびにアクセスし直して履歴が溜まる（「historyにpushする」）のを防ぎ、「現在のエントリを次のページで置き換える」
+              // 最初の検索かどうかを確認して、置き換えるかどうか決定する。削除するときも一文字ずつじゃなくて一気に戻れる
+              onChange={(event) => {
+                const isFirstSearch = q === null;
+                submit(event.currentTarget, {
+                  replace: !isFirstSearch,
+                });
+              }}
               role="search">
               <input
                 id="q"

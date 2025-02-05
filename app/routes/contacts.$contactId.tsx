@@ -5,8 +5,12 @@ import type { ContactRecord } from "../data";
 
 // 連絡先ページにloader関数を追加して、useLoaderDataを使ってデータにアクセスする
 import { json } from "@remix-run/node";
-import { Form, useLoaderData } from "@remix-run/react";
-import { getContact } from "../data";
+import {
+  Form,
+  useFetcher,
+  useLoaderData,
+} from "@remix-run/react";
+import { getContact, updateContact } from "../data";
 // Typescriptのエラー解消で下のasync関数にも手を入れた
 // コードに潜在的な問題があると予想される場合に、カスタムメッセージでエラーをスローするための便利な関数[invariant]
 export const loader = async ({
@@ -22,9 +26,23 @@ export const loader = async ({
 };
 
 // Typescriptのエラー解消
-import type { LoaderFunctionArgs } from "@remix-run/node";
+import type {
+  ActionFunctionArgs,
+  LoaderFunctionArgs,
+} from "@remix-run/node";
 import invariant from "tiny-invariant";
 
+// お気に入り機能の⭐︎のaction関数
+export const action = async ({
+  params,
+  request,
+}: ActionFunctionArgs) => {
+  invariant(params.contactId, "Missing contactId param");
+  const formData = await request.formData();
+  return updateContact(params.contactId, {
+    favorite: formData.get("favorite") === "true",
+  });
+};
 
 
 export default function Contact() {
@@ -103,10 +121,15 @@ export default function Contact() {
 const Favorite: FunctionComponent<{
   contact: Pick<ContactRecord, "favorite">;
 }> = ({ contact }) => {
-  const favorite = contact.favorite;
+  const fetcher = useFetcher();
+  // fetcher.formDataがactionに送信されるデータを持っているので、それをあらかじめ更新に使っちゃう。って感じ？
+  const favorite = fetcher.formData
+    ? fetcher.formData.get("favorite") === "true"
+    : contact.favorite;
 
   return (
-    <Form method="post">
+    // fetcherをつけることで、ナビゲーションを起こす（urlを変える？）ことなくactionやloader関数と通信できる
+    <fetcher.Form method="post">
       <button
         aria-label={
           favorite
@@ -118,6 +141,6 @@ const Favorite: FunctionComponent<{
       >
         {favorite ? "★" : "☆"}
       </button>
-    </Form>
+    </fetcher.Form>
   );
 };
